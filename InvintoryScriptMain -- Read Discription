@@ -1,0 +1,396 @@
+           --<Services>-- --<Demo Game https://www.roblox.com/games/17420180630/InventoryDemo>--
+local Players = game:GetService('Players') -- gets the players service
+local RunService = game:GetService('RunService') -- gets the run service
+local StarterGui = game:GetService('StarterGui') -- gets the starter gui service
+local UserInputService = game:GetService('UserInputService') -- gets the user input service
+                   --<Disable Roblox's Backpack>--
+repeat -- starts a repeat
+local Success, Error = pcall(function() -- wraps a pcall
+		StarterGui:SetCoreGuiEnabled(Enum.CoreGuiType.Backpack, false) -- disables roblox's backpack
+end) -- ends the pcall wrap
+wait() -- waits as fast the players comuter can handle it
+until Success -- ends the reapeat when we have successfully disabled roblox's backpack
+
+
+--[!] const
+
+-- max tool slot size
+local TOOL_MAX_SLOTS = 10 -- sets max tool slots
+
+-- i.e. GUI-related tool slot settings
+local TOOL_SIZE = 50            -- tool icon size
+local TOOL_BORDER_OFFSET = 15   -- gap between icons
+local TOOL_BOTTOM_OFFSET = 20   -- offset from bottom of screen
+
+-- keycode values, see here: https://create.roblox.com/docs/reference/engine/enums/KeyCode
+--
+--    where:
+--      48 = Zero
+--      49 = One
+--       n = ...
+--      57 = Nine
+--
+local NUMERIC_KEYCODE_ZRO = 48 -- gets the zero keycode
+local NUMERIC_KEYCODE_MIN = 49 -- gets the minimum keycode for our keycodes(1)
+local NUMERIC_KEYCODE_MAX = 57 -- gets the maximum keycode for our keycodes(9)
+
+local NUMERIC_KEYCODE_RANGE = NumberRange.new(NUMERIC_KEYCODE_MIN, NUMERIC_KEYCODE_MAX) -- i.e. the range of Enum.KeyCode[name].Value that represents numeric keycodes
+
+-- i.e. set up a dictionary that maps the value to a specific keycode
+local KEYCODE_VALUES = { } -- creates a table
+for _, keycode in next, Enum.KeyCode:GetEnumItems() do -- gets all the keycodes
+	KEYCODE_VALUES[keycode.Value] = keycode -- adds the keycode to the value
+end -- ends when all the keycodes were goten
+
+
+--[!] utils
+
+-- checks whether a character is alive, and has valid character instances e.g. humanoid + rootpart
+local function tryGetCharacterInstances(character) -- checks whether the char is alive
+	if typeof(character) ~= 'Instance' or not character:IsA('Model') or not character:IsDescendantOf(workspace) then -- goes through all of the players stuff and if its not = to an instance or moddel or char is a dicendent of the workspace then
+		return false -- returns and breaks the following code and returns false
+	end -- this has checked whether the char is a char
+
+	local humanoid = character:FindFirstChildOfClass('Humanoid') -- finds the players char
+	local humanoidState = humanoid and humanoid:GetState() or Enum.HumanoidStateType.Dead -- gets the humoids state
+	local humanoidRootPart = humanoid and humanoid.RootPart or nil -- gets the humanoid root part and humanoid
+	if humanoidState == Enum.HumanoidStateType.Dead or not humanoidRootPart then -- if the humanoid is dead it runs the following
+		return false -- breaks the following code and returns false
+	end -- this has checked whether the character was alive
+
+	return true, humanoid, humanoidRootPart -- if the char we are talking abt is a actual char and is alive we return true
+end
+
+-- wait until we find a valid character
+local function awaitCharacter(player) -- this block of code waits untill we find a valid char
+	if typeof(player) ~= 'Instance' or not player:IsA('Player') then -- checks if the player is not and instance or a player then do this
+		return nil -- return nil
+	end -- this has checked whether our plr was a real plr
+
+	local character -- sets a local variable named character
+	while not character do -- while character is nil do the following
+		if not player or not player:IsDescendantOf(Players) then -- if it is not a player or is a decendent of a players do the following
+			break -- breaks the code
+		end -- this has checked if the player is a okayer or a decend of players
+
+		local char = player.Character -- gets the plrs character
+		if not char then -- if char is nil then
+			player.CharacterAdded:Wait() -- wait for the character to be added
+			continue -- then continues
+		end -- ends the if not statment
+
+		local valid = tryGetCharacterInstances(char) -- makes a var called valid that is just the char trying to get char instances
+		if not valid then -- if valid = nil then
+			RunService.Stepped:Wait() -- wait until the plr moves
+			continue -- continues
+		end -- this has waited until the character moves if valid = nil
+
+		character = char -- sets character to char
+	end -- this has found the characer
+
+	return character -- returns the character
+end -- this has waited for the character
+
+
+--[!] methods
+local function createToolSlot(parent, index, keyCode) -- this creates the plrs tool slots
+	local position = index - math.ceil(TOOL_MAX_SLOTS*0.5) -- gets the possition we want this new slot
+	
+	local frame = Instance.new('ImageButton') -- creates a image button
+	frame.Name = 'Toolslot' .. index -- we name this image button toolslot(number of slot so for exp:Toolslot1)
+	frame.Size = UDim2.fromOffset(TOOL_SIZE, TOOL_SIZE) -- sets the frames size to the size we set above
+	frame.Position = UDim2.new(0.5, position*(TOOL_SIZE + TOOL_BORDER_OFFSET*0.5), 1, -TOOL_BOTTOM_OFFSET) -- sets the possition to some fancy stuff that just aligns with everything else
+	frame.AnchorPoint = Vector2.new(0.5, 1) -- sets the anchor point
+	frame.BorderSizePixel = 1 -- gives it a anchor point
+	frame.BackgroundTransparency = 0 -- sets the backround trancparency to visible
+	frame.Image = '' -- sets its image to nothing
+	frame.ImageTransparency = 1 -- sets the image transparency to invisible(1)
+
+	local posLabel = Instance.new('TextLabel') -- creates a new lable
+	posLabel.Name = 'PositionLabel' -- names it "PositionLable"
+	posLabel.Size = UDim2.fromOffset(13, 13) -- sets its size
+	posLabel.Position = UDim2.fromScale(0, 0) -- sets its possition to 0,0
+	posLabel.AnchorPoint = Vector2.new(0, 0) -- sets its anchor point
+	posLabel.BorderSizePixel = 1 -- sets its boarder
+	posLabel.BackgroundTransparency = 1 -- makes the backround invisable
+	posLabel.Text = tostring(index) -- makes the text index which is 1,9 + 0 so it could look like 1 for example
+	posLabel.Parent = frame -- makes its parent to frame
+	
+	local StackLabel = Instance.new('TextLabel') -- creates a new lable
+	StackLabel.Name = 'StackLabel' -- names it "StackLabel"
+	StackLabel.Size = UDim2.fromOffset(13, 13) -- sets its size
+	StackLabel.Position = UDim2.fromScale(0.8, 0.8) -- sets its possition to the bottom right corner of the frame
+	StackLabel.AnchorPoint = Vector2.new(0, 0) -- sets its anchor point
+	StackLabel.BorderSizePixel = 1 -- sets its boarder
+	StackLabel.BackgroundTransparency = 1 -- sets the backround invisisble
+	StackLabel.Transparency = 1 -- sets the label to invisible
+	StackLabel.Text = 0 -- sets its text to 0
+	StackLabel.Parent = frame -- sets its parent to frame
+
+	local toolLabel = Instance.new('TextLabel') -- creates a new label
+	toolLabel.Name = 'ToolLabel' -- names it "toollabel"
+	toolLabel.Size = UDim2.new(1, 0, 0, 25) -- sets its size
+	toolLabel.Position = UDim2.fromScale(0.5, 0.5) -- sets its position 
+	toolLabel.AnchorPoint = Vector2.new(0.5, 0.5) -- sets its anchor point
+	toolLabel.BorderSizePixel = 1 -- sets its boarder
+	toolLabel.TextColor3 = Color3.fromHSV(0.98, 0.7, 0.75) -- sets the text collor to red
+	toolLabel.BackgroundTransparency = 1 -- sets its backround transparency
+	toolLabel.Text = '' -- sets its text to nothing
+	toolLabel.Parent = frame -- sets its parent to frame
+	toolLabel.TextScaled = true -- sets the textscaled to true
+
+	frame.Parent = parent -- sets the frames parent to the screen gui(parent)
+	return frame, toolLabel -- returns frame and toolLabel
+end -- this created the players tool slots
+
+
+-- used to check whether the tool is still within the
+-- player's backpack / their character; and if not, will remove
+-- it from the slots e.g. in cases where they pressed backspace to drop the tool
+--
+local function handleToolRemoval(player, toolSlots, object, connection) -- when the tool is being removed it does this
+	-- make sure we've not just equipped the tool
+	local character = player.Character -- sets a var named character to the pltd char
+	if object:IsDescendantOf(player) or (character and object:IsDescendantOf(character)) then -- if the object is a desendent of the player or character and is a descendantof the character it does the following
+		return -- returns the script
+	end -- this has checked if the object is a desendent of the player or character and is a descendantof the character and if it is it returns
+
+	-- find the tool slot so we can remove it
+	local toolSlot -- this makes a variable names toolSlot
+	for i = 1, TOOL_MAX_SLOTS, 1 do -- goes through all the tool slots 
+		local slot = toolSlots[i] -- gets the toolslot
+		if slot.Tool == object then -- if the tool in the toolslot is == to the object(the tool) then
+			toolSlot = slot -- sets the toolslot to the slot
+			break -- breaks the code
+		end
+	end
+	                                                                   --<NOTE>--
+	-- Ive goten tired of noting every single line so ima stop noting every single line and only note the lines i feel are not obvious what they do(Sorry)
+	-- stop listening to this tool's ancestry since it's been not related to our player now
+	if connection and connection.Connected then 
+		connection:Disconnect() -- disables the connection
+	end
+end
+local function RemoveToolSlot(toolSlot) -- starts a function names "RemoveToolSlot"
+	if toolSlot then -- if the toolslot is not == nil then
+		-- just resets the toolslot
+		toolSlot.Tool = nil
+		toolSlot.Label.Text = ''
+	end
+end
+
+-- used to add the tool to the next best slot
+-- if not already present
+--
+local function handleToolAdded(player, toolSlots, object, FromCharacter) -- this handels when the tool is added
+	if not object:IsA('Tool') then
+		return
+	end
+	-- make sure we don't already exist
+	-- otherwise select next best empty slot
+	local CreateNewSlot = true
+	local NewItem = object.NewItem -- this is a value in all the items
+	if FromCharacter == true then -- multiple things fire for this so this would run 2 times instead it only runs when it fires from the char added (youl see later)
+		if NewItem.Value == true then -- if this is a new item that hasnt been picked up before (This makes sure when you togle(Equip And Unequip) an item it has just been picked up)
+			NewItem.Value = false -- says we have alr picked this up
+	for i,item in pairs(Players.LocalPlayer.Character:GetChildren()) do -- runs through all the chars items to find the tool
+		if item:IsA("Tool") then
+			for i, S in pairs(script.Parent:GetChildren()) do -- runs through the guis children
+				if S:IsA("ImageButton") then -- checks if its a slot
+					if S.ToolLabel.Text == item.Name then -- checks if the item is equipted in the toolabel
+						S.StackLabel.Transparency = true
+						if S.StackLabel.Text == "0" then
+							S.StackLabel.Text = 2 -- adds 2 because it doesent count when you get 1 because it doesent play this (it has to do with the slot creation it creates a slot when the new item was Just added)
+							CreateNewSlot = false -- sets create new slot to false because we dont need a new slot
+						else -- if stackLabel.Text is ablove 0 then
+									S.StackLabel.Text = tonumber(S.StackLabel.Text) + 1 -- adds the Stacklabel text + 1
+									CreateNewSlot = false -- we dont need a new slot
+						end
+					end
+				end
+			end
+		end
+	end
+		if CreateNewSlot == true then -- checks if we need a new slot
+			local bestSlot -- sets a value names best slot
+			for i = 1, TOOL_MAX_SLOTS, 1 do -- loops through all the slots
+				local slot = toolSlots[i] -- finds the slot
+				if slot.Tool == object then -- if the slot is alr Ocupied we return
+					return
+				elseif not bestSlot and not slot.Tool then -- checks if the slot has no other item inside it
+					bestSlot = i -- sets the bestslot to i
+				end
+			end
+			if bestSlot then -- if we have a bestslot then
+				-- i.e. we're a new tool
+				-- gives the bestslot the properties of the item it needs
+				bestSlot = toolSlots[bestSlot]
+				bestSlot.Tool = object
+				bestSlot.Label.Text = object.Name
+			end
+		end
+		end
+		end
+		-- watch the ancestry of the object (i.e. it's parent)
+		-- to check when the player removes the tool from its backpack
+		-- and/or its character
+		local watchdog 
+		watchdog = object.AncestryChanged:Connect(function ()
+			handleToolRemoval(player, toolSlots, object, watchdog)
+		end)
+		end
+
+
+--[!] setup
+local player = Players.LocalPlayer -- makes a variable and sets it to player
+local backpack = player:WaitForChild('Backpack') -- makes a variable and sets it to backpack
+local character = awaitCharacter(player) -- makes a variable and sets it to the plrs character
+local screenGui = script.Parent -- sets a variable and names it screengui
+
+
+-- states
+local toolSlots = table.create(TOOL_MAX_SLOTS)  -- i.e. all of the tool slots
+local toolSlotMap = { }                         -- i.e. a map between a keycode and a tool slot
+
+local selectedToolSlot                          -- the tool slot we're trying to swap
+local isChangingKeybinds = false                -- whether we're trying to change our keybinds
+
+
+-- set up our keybind slots
+for i = 1, TOOL_MAX_SLOTS, 1 do -- loop through all the slots
+	-- get the KeyCode from the slot number
+	local keyCode
+	if i == TOOL_MAX_SLOTS then -- if i = the max slot then its keycode is == 0
+		keyCode = KEYCODE_VALUES[NUMERIC_KEYCODE_ZRO]
+	else -- if i is not = max tool slots sets the keycode
+		keyCode = KEYCODE_VALUES[NUMERIC_KEYCODE_MIN + (i - 1)]
+	end
+
+	-- set up the slot
+	local slot, toolLabel = createToolSlot(screenGui, i, keyCode)
+	-- append to our list
+	toolSlots[i] = { -- sets the tool slots up
+		Tool = nil,
+		Slot = slot,
+		Label = toolLabel,
+		ScreenGui = screenGui,
+		Index = i,
+		KeyCode = keyCode,
+	}
+	toolSlotMap[keyCode] = i
+
+	-- set up the listener
+	slot.MouseButton1Click:Connect(function () -- if the slot is clicked
+		-- set the selected one to our current slot
+		-- if we aren't already trying to change it
+		if not isChangingKeybinds then -- if this is the first click it sets some things and returns
+			isChangingKeybinds = true
+			selectedToolSlot = i
+			return
+		end
+-- if this is the secont time it swaps the the neccessary data between the 2 slots
+		local StackLabels = {screenGui.Toolslot1.StackLabel, screenGui.Toolslot2.StackLabel, screenGui.Toolslot3.StackLabel, screenGui.Toolslot4.StackLabel,screenGui.Toolslot5.StackLabel,
+			screenGui.Toolslot6.StackLabel, screenGui.Toolslot7.StackLabel, screenGui.Toolslot8.StackLabel,screenGui.Toolslot9.StackLabel, screenGui.Toolslot10.StackLabel}
+		-- swap our slots around
+		local swapSlot = toolSlots[selectedToolSlot]
+		local thisSlot = toolSlots[i]
+
+		-- swap our tool reference around
+		thisSlot.Tool, swapSlot.Tool = swapSlot.Tool, thisSlot.Tool
+
+		-- swap the label text around
+		thisSlot.Label.Text, swapSlot.Label.Text = swapSlot.Label.Text, thisSlot.Label.Text
+		
+		-- swap the transparency around
+		StackLabels[i].Transparency, StackLabels[selectedToolSlot].Transparency = StackLabels[selectedToolSlot].Transparency, StackLabels[i].Transparency
+		
+		-- swap the stack nums around
+		StackLabels[i].Text, StackLabels[selectedToolSlot].Text = StackLabels[selectedToolSlot].Text, StackLabels[i].Text
+		isChangingKeybinds, selectedToolSlot = false, nil
+	end)
+end
+
+
+-- set up our input action(s)
+UserInputService.InputBegan:Connect(function (input, gameProcessed) -- when the player begins an imput it fires this
+	local inputType = input.UserInputType -- gets the imput type
+	if gameProcessed or inputType ~= Enum.UserInputType.Keyboard then
+		return
+	end
+
+	-- ignore if we're dead
+	local isValid, humanoid = tryGetCharacterInstances(character)
+	if not isValid then -- if we cant get the characters instances it just returns
+		return
+	end
+	-- try to get the slot from the keycode and ignore if it doesn't exist
+	local keyCode = input.KeyCode -- just sets the keycode
+	local slotIndex = toolSlotMap[keyCode] -- gets the imputs with the keycodes
+	local toolSlot = slotIndex and toolSlots[slotIndex] or nil -- gets the toolslots and slotIndex
+	if keyCode == Enum.KeyCode.Q then -- when the player clicks Q
+		for i, Item in pairs(Players.LocalPlayer.Character:GetChildren()) do -- runs through all the chars items
+			if Item:IsA("Tool") then -- if its a tool do the following
+				for i, ItemSlot in pairs(script.Parent:GetChildren()) do -- goes through the screen gui
+					if ItemSlot:IsA("ImageButton") then -- if its an slot then
+						if ItemSlot.ToolLabel.Text == Item.Name then -- if the toolabel.text = to the items name then(in other words if the slot is ocupied by the item)
+							if tonumber(ItemSlot.StackLabel.Text) == 0 then -- if stacklabel is 0 then we just reset the slot
+								ItemSlot.StackLabel.Text = 0 
+								for i, Item in pairs(Players.LocalPlayer.Character:GetChildren() and Players.LocalPlayer.Backpack:GetChildren()) do -- go through all the players tools
+									if Item:IsA("Tool") then
+										if Item.Name == ItemSlot.ToolLabel.Text then -- if its a stacked item then we reset some stuff
+											toolSlots[tonumber(ItemSlot.PositionLabel.Text)].Label.Text = ""
+											toolSlots[tonumber(ItemSlot.PositionLabel.Text)].Tool = nil
+											Item:Destroy() -- Replace this with what you want to do I.E sell the item or drop the item (realy whatever you want)
+											humanoid:UnequipTools() -- unequipt the players tools
+										end
+									end
+								end
+							elseif tonumber(ItemSlot.StackLabel.Text) == 2 then -- else if its == 2 then we set it the propertys of if you had 1 item
+								ItemSlot.StackLabel.Text = 0
+								ItemSlot.StackLabel.Transparency = 1
+							elseif tonumber(ItemSlot.StackLabel.Text) >= 2 then -- else if it just subtracts 1 from the stacklabel
+								ItemSlot.StackLabel.Text = tonumber(ItemSlot.StackLabel.Text) - 1
+							end
+						end
+					end
+				end
+			end
+		end
+	end
+	if not toolSlot then -- if there isnt a toolslot being ocupied it just returns
+		return
+	end
+
+	-- if we haven't got a tool for this slot we can ignore it
+	local tool = toolSlot.Tool
+	if not tool then -- if there isnt a toolslot.Tool being ocupied it just returns
+		return
+	end
+
+	-- equip it if we're not using it;
+	-- otherwise unequip it
+	if tool.Parent ~= character then -- if the tools parent isnt character (its not equipt)
+		humanoid:EquipTool(tool) -- it equips the tool
+	else -- if its equipt then we just unequipt it
+		humanoid:UnequipTools()
+	end
+end)
+
+
+-- set up our listener(s)
+--    - we need to make sure we look at those already
+--      in the backback too
+--
+--    - we also need to make sure any tools added to the char
+--      via pickup get added
+--
+for _, object in next, backpack:GetChildren() do -- runs through all the players backpacks chidren
+	handleToolAdded(player, toolSlots, object, false) -- fires tool added
+end
+
+backpack.ChildAdded:Connect(function (object) -- when a item is added to the backpack it fires this
+	handleToolAdded(player, toolSlots, object, false) -- fires tool added
+end)
+character.ChildAdded:Connect(function (object) -- when a new item is equipt and added to the character it fires this
+	handleToolAdded(player, toolSlots, object, true) -- fires tool added
+end) -- Thanks For Reading!
